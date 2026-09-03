@@ -2,14 +2,14 @@
   "title": "Dynamic Blog Test",
   "slug": "test-dynamic-blog",
   "date": "2026-09-03",
-  "author": "Infer Origins",
+  "author": "inferscope",
   "summary": "Testing independently published Infer Origins blog content.",
-  "description": "A test article demonstrating the independently built Infer Origins blog publishing system.",
+  "description": "A test article demonstrating the content for blog publishing system.",
   "tags": [
     "engineering",
     "platform"
   ],
   "featured": false,
-  "image": "images/Infer-PaaS foundation.svg",
-  "cover": "images/Infer-PaaS foundation.svg"
+  "image": "images/Infer-PaaS-foundation.svg",
+  "cover": "images/Infer-PaaS-foundation.svg"
 }

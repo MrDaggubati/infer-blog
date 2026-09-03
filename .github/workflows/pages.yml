@@ -1,0 +1,118 @@
+name: Build and deploy blog
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: true
+
+env:
+  PUBLIC_DIR: public
+  CONTENT_DIR: content/blog
+  CACHE_DIR: .cache
+
+  BLOG_CNAME: ${{ vars.BLOG_CNAME || 'blog.inferorigins.com' }}
+  BLOG_BASE_URL: ${{ vars.BLOG_BASE_URL || 'https://blog.inferorigins.com' }}
+  MAIN_SITE_URL: ${{ vars.MAIN_SITE_URL || 'https://www.inferorigins.com' }}
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # FFmpeg is an OS-level dependency, so install it here rather
+      # than making the Makefile depend on apt/Ubuntu.
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Check dependencies
+        run: make check-deps
+
+      - name: Build blog
+        run: make build
+
+      - name: Create Pages root
+        run: |
+          mkdir -p "$PUBLIC_DIR"
+
+          cat > "$PUBLIC_DIR/index.html" <<'EOF'
+          <!doctype html>
+          <html lang="en">
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>Infer Origins Blog Content</title>
+          </head>
+          <body>
+            <p>Infer Origins blog content service.</p>
+          </body>
+          </html>
+          EOF
+
+      - name: Disable Jekyll
+        run: touch "$PUBLIC_DIR/.nojekyll"
+
+      - name: Verify build output
+        run: |
+          echo
+          echo "Generated files:"
+          find "$PUBLIC_DIR" -maxdepth 5 -type f | sort
+
+          echo
+          echo "Checking required deployment files..."
+
+          test -f "$PUBLIC_DIR/index.html"
+          test -f "$PUBLIC_DIR/index.json"
+          test -f "$PUBLIC_DIR/blog/index.json"
+          test -f "$PUBLIC_DIR/CNAME"
+          test -f "$PUBLIC_DIR/.nojekyll"
+
+          echo
+          echo "CNAME:"
+          cat "$PUBLIC_DIR/CNAME"
+
+          echo
+          echo "Build output verified."
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: ./public
+
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    needs: build
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

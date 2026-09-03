@@ -1,52 +1,73 @@
-BLOG_COVER_SIZE := 1000x500
-BLOG_COVER_QUALITY := 85
+SHELL := /bin/bash
 
-.PHONY: help tidy build clean rebuild blog-cover blog-cover-slug serve
+CLI := go run ./cmd/blogbuild
+
+BIN := infer-blog
+PREFIX ?= /usr/local
+
+VERSION ?= 0.1.0
+LDFLAGS := -X main.version=$(VERSION)
+
+PORT ?= 8080
+HOST ?= localhost
+
+.PHONY: help deps check-deps tidy fmt build rebuild clean clean-cache clean-all serve cli install uninstall version
 
 help:
-	@echo "Targets:"
-	@echo "  make tidy"
-	@echo "  make build"
-	@echo "  make rebuild"
-	@echo "  make clean"
-	@echo "  make serve"
-	@echo "  make blog-cover SRC=input.png OUT=content/blog/slug/images/cover.webp"
-	@echo "  make blog-cover-slug SLUG=test-dynamic-blog SRC=input.png"
+	@$(CLI) --help
+
+deps:
+	@$(CLI) check
+
+check-deps:
+	@$(CLI) check
 
 tidy:
-	go mod tidy
+	@go mod tidy
+
+fmt:
+	@gofmt -w cmd/blogbuild/*.go
 
 build:
-	go run ./cmd/blogbuild
+	@$(CLI) build
+
+rebuild:
+	@$(CLI) rebuild
 
 clean:
-	rm -rf public
+	@$(CLI) clean
 
-rebuild: clean tidy build
+clean-cache:
+	@$(CLI) clean-cache
 
-blog-cover:
-	@test -n "$(SRC)" || (echo "Usage: make blog-cover SRC=path/to/image.png OUT=path/to/cover.webp"; exit 1)
-	@test -n "$(OUT)" || (echo "Usage: make blog-cover SRC=path/to/image.png OUT=path/to/cover.webp"; exit 1)
-	@mkdir -p "$$(dirname "$(OUT)")"
-	ffmpeg -y \
-		-i "$(SRC)" \
-		-vf "scale=$(BLOG_COVER_SIZE):force_original_aspect_ratio=increase,crop=$(BLOG_COVER_SIZE)" \
-		-c:v libwebp \
-		-quality $(BLOG_COVER_QUALITY) \
-		"$(OUT)"
+clean-all:
+	@$(CLI) clean-all
 
-blog-cover-slug:
-	@test -n "$(SLUG)" || (echo "Usage: make blog-cover-slug SLUG=test-dynamic-blog SRC=cover.png"; exit 1)
-	@test -n "$(SRC)" || (echo "Usage: make blog-cover-slug SLUG=test-dynamic-blog SRC=cover.png"; exit 1)
-	@mkdir -p "content/blog/$(SLUG)/images"
-	ffmpeg -y \
-		-i "$(SRC)" \
-		-vf "scale=$(BLOG_COVER_SIZE):force_original_aspect_ratio=increase,crop=$(BLOG_COVER_SIZE)" \
-		-c:v libwebp \
-		-quality $(BLOG_COVER_QUALITY) \
-		"content/blog/$(SLUG)/images/cover.webp"
+serve:
+	@$(CLI) serve --host "$(HOST)" --port "$(PORT)"
 
-serve: build
-	@echo "Serving blog at http://localhost:8080"
-	python3 -m http.server 8080 --directory public
+cli:
+	@go build \
+		-ldflags "$(LDFLAGS)" \
+		-o "$(BIN)" \
+		./cmd/blogbuild
+	@printf 'built %s %s\n' "$(BIN)" "$(VERSION)"
 
+install:
+	@go build \
+		-ldflags "$(LDFLAGS)" \
+		-o "$(BIN)" \
+		./cmd/blogbuild
+	@install -m 0755 "$(BIN)" "$(PREFIX)/bin/$(BIN)"
+	@printf 'installed %s %s -> %s/bin/%s\n' \
+		"$(BIN)" \
+		"$(VERSION)" \
+		"$(PREFIX)" \
+		"$(BIN)"
+
+uninstall:
+	@rm -f "$(PREFIX)/bin/$(BIN)"
+	@printf 'removed %s/bin/%s\n' "$(PREFIX)" "$(BIN)"
+
+version:
+	@printf '%s %s\n' "$(BIN)" "$(VERSION)"

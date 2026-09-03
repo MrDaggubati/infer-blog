@@ -16,12 +16,20 @@ import (
 	"github.com/yuin/goldmark/parser"
 )
 
-const (
-	sourceDir = "content/blog"
-	outputDir = "public/blog"
+var (
+	publicRootDir = envOrDefault("PUBLIC_DIR", "public")
+	sourceDir     = envOrDefault("CONTENT_DIR", "content/blog")
+	outputDir     = filepath.Join(publicRootDir, "blog")
 
-	publicBaseURL = "https://blog.inferorigins.com"
-	siteBaseURL   = "https://www.inferorigins.com"
+	publicBaseURL = strings.TrimRight(
+		envOrDefault("BLOG_BASE_URL", "https://blog.inferorigins.com"),
+		"/",
+	)
+	siteBaseURL = strings.TrimRight(
+		envOrDefault("MAIN_SITE_URL", "https://www.inferorigins.com"),
+		"/",
+	)
+	blogCNAME = envOrDefault("BLOG_CNAME", "blog.inferorigins.com")
 )
 
 var markdown = goldmark.New(
@@ -45,17 +53,20 @@ type BlogMeta struct {
 	Tags        []string `json:"tags"`
 	Featured    bool     `json:"featured"`
 
-	// Card image.
+	// Source image declared in meta.json.
+	// During build this is rewritten to:
+	// images/card.webp
 	Image string `json:"image,omitempty"`
 
-	// Article hero image.
+	// Source hero declared in meta.json.
+	// During build this is rewritten to:
+	// images/cover.webp
 	Cover string `json:"cover,omitempty"`
 
-	// Generated URLs.
+	// Generated public URLs.
 	Article string `json:"article"`
 	URL     string `json:"url"`
 }
-
 
 func buildBlog() error {
 	if err := os.RemoveAll(outputDir); err != nil {
@@ -135,15 +146,18 @@ func buildBlog() error {
 		}
 
 		/*
-			Process all article images first.
+			Process/copy images.
 
-			This generates:
-			  cover.webp
-			  card.webp
-			  *.webp
+			Important:
+			processImages receives &meta and rewrites:
+
+			  meta.Image -> images/card.webp
+			  meta.Cover -> images/cover.webp
 		*/
 		if err := processImages(
 			postDir,
+			postOutputDir,
+			&meta,
 		); err != nil {
 			return fmt.Errorf(
 				"process images for %s: %w",
@@ -152,30 +166,6 @@ func buildBlog() error {
 			)
 		}
 
-		/*
-			Copy article image directory
-			into public output.
-		*/
-		if err := copyImages(
-			filepath.Join(
-				postDir,
-				"images",
-			),
-			filepath.Join(
-				postOutputDir,
-				"images",
-			),
-		); err != nil {
-			return fmt.Errorf(
-				"copy images for %s: %w",
-				meta.Slug,
-				err,
-			)
-		}
-
-		/*
-			Write generated Markdown HTML fragment.
-		*/
 		if err := os.WriteFile(
 			filepath.Join(
 				postOutputDir,
@@ -187,9 +177,6 @@ func buildBlog() error {
 			return err
 		}
 
-		/*
-			Generated public URLs.
-		*/
 		meta.Article =
 			publicBaseURL +
 				"/blog/" +
@@ -201,6 +188,10 @@ func buildBlog() error {
 				"/blog/" +
 				meta.Slug
 
+		/*
+			At this point processImages has already changed
+			Image/Cover to their generated WebP filenames.
+		*/
 		meta.Image = articleAssetURL(
 			meta.Slug,
 			meta.Image,
@@ -219,7 +210,19 @@ func buildBlog() error {
 
 	sortPosts(posts)
 
-	return writeIndex(posts)
+	if err := writeIndex(posts); err != nil {
+		return err
+	}
+
+	if err := writeRootIndex(posts); err != nil {
+		return err
+	}
+
+	if err := writeCNAME(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func readMeta(
@@ -384,6 +387,48 @@ func writeIndex(
 			"index.json",
 		),
 		data,
+		0o644,
+	)
+}
+
+func writeRootIndex(
+	posts []BlogMeta,
+) error {
+	data, err := json.MarshalIndent(
+		posts,
+		"",
+		"  ",
+	)
+	if err != nil {
+		return err
+	}
+
+	data = append(
+		data,
+		'\n',
+	)
+
+	return os.WriteFile(
+		filepath.Join(
+			publicRootDir,
+			"index.json",
+		),
+		data,
+		0o644,
+	)
+}
+
+func writeCNAME() error {
+	if strings.TrimSpace(blogCNAME) == "" {
+		return nil
+	}
+
+	return os.WriteFile(
+		filepath.Join(
+			publicRootDir,
+			"CNAME",
+		),
+		[]byte(strings.TrimSpace(blogCNAME)+"\n"),
 		0o644,
 	)
 }

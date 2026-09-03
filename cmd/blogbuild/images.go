@@ -2,124 +2,91 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 )
+func supportedImageExtension(
+	ext string,
+) bool {
+	switch ext {
+	case ".svg",
+		".png",
+		".jpg",
+		".jpeg":
+		return true
 
-const (
-	coverWidth  = 1600
-	coverHeight = 900
-
-	cardWidth  = 1000
-	cardHeight = 500
-)
+	default:
+		return false
+	}
+}
 
 func processImages(
 	postDir string,
+	postOutputDir string,
+	meta *BlogMeta,
 ) error {
-	imagesDir := filepath.Join(
+	sourceImagesDir := filepath.Join(
 		postDir,
 		"images",
 	)
 
-	entries, err := os.ReadDir(imagesDir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
+	outputImagesDir := filepath.Join(
+		postOutputDir,
+		"images",
+	)
 
+	if err := os.MkdirAll(
+		outputImagesDir,
+		0o755,
+	); err != nil {
 		return err
 	}
 
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
+	/*
+		Copy authored images exactly as they are.
 
-		name := entry.Name()
+		SVG remains SVG.
+		PNG remains PNG.
+		JPEG remains JPEG.
+		WebP remains WebP.
 
-		ext := strings.ToLower(
-			filepath.Ext(name),
-		)
+		No resizing.
+		No rasterization.
+		No compression.
+	*/
+	if err := copyOriginalImages(
+		sourceImagesDir,
+		outputImagesDir,
+	); err != nil {
+		return err
+	}
 
-		if !supportedImageExtension(ext) {
-			continue
-		}
+	/*
+		Validate the image and cover references from meta.json.
 
-		baseName := strings.TrimSuffix(
-			name,
-			filepath.Ext(name),
-		)
-
-		sourcePath := filepath.Join(
-			imagesDir,
-			name,
-		)
-
-		/*
-			Generated files should not
-			be processed again.
-		*/
-		if name == "cover.webp" ||
-			name == "card.webp" {
-			continue
-		}
-
-		/*
-			Cover source.
-
-			Supported examples:
-
-			cover.png
-			cover.jpg
-			cover.jpeg
-			cover.svg
-
-			cover-source.png
-			cover-source.jpg
-			cover-source.svg
-			cover-source.webp
-		*/
-		if baseName == "cover" ||
-			baseName == "cover-source" {
-
-			if err := processCover(
-				sourcePath,
-				imagesDir,
-			); err != nil {
-				return fmt.Errorf(
-					"process cover %s: %w",
-					sourcePath,
-					err,
-				)
-			}
-
-			continue
-		}
-
-		/*
-			Existing WebP article images
-			require no conversion.
-		*/
-		if ext == ".webp" {
-			continue
-		}
-
-		outputPath := filepath.Join(
-			imagesDir,
-			baseName+".webp",
-		)
-
-		if err := convertArticleImage(
-			sourcePath,
-			outputPath,
-			ext,
+		Do NOT rewrite them to card.webp / cover.webp.
+	*/
+	if strings.TrimSpace(meta.Image) != "" {
+		if _, err := resolveImageSource(
+			postDir,
+			meta.Image,
 		); err != nil {
 			return fmt.Errorf(
-				"convert image %s: %w",
-				sourcePath,
+				"invalid card image: %w",
+				err,
+			)
+		}
+	}
+
+	if strings.TrimSpace(meta.Cover) != "" {
+		if _, err := resolveImageSource(
+			postDir,
+			meta.Cover,
+		); err != nil {
+			return fmt.Errorf(
+				"invalid cover image: %w",
 				err,
 			)
 		}
@@ -128,152 +95,74 @@ func processImages(
 	return nil
 }
 
-func supportedImageExtension(
-	ext string,
-) bool {
-	switch ext {
-	case ".png",
-		".jpg",
-		".jpeg",
-		".svg",
-		".webp":
-		return true
-	default:
-		return false
+func resolveImageSource(
+	postDir string,
+	value string,
+) (string, error) {
+	value = strings.TrimSpace(value)
+
+	if value == "" {
+		return "", fmt.Errorf(
+			"image path is empty",
+		)
 	}
+
+	if strings.HasPrefix(
+		value,
+		"http://",
+	) ||
+		strings.HasPrefix(
+			value,
+			"https://",
+		) {
+		return "", fmt.Errorf(
+			"remote image sources are not supported: %s",
+			value,
+		)
+	}
+
+	clean := filepath.Clean(
+		filepath.FromSlash(value),
+	)
+
+	path := filepath.Join(
+		postDir,
+		clean,
+	)
+
+	info, err := os.Stat(path)
+	if err != nil {
+		return "",
+			fmt.Errorf(
+				"source image %q: %w",
+				path,
+				err,
+			)
+	}
+
+	if info.IsDir() {
+		return "", fmt.Errorf(
+			"%s is a directory",
+			path,
+		)
+	}
+
+	ext := strings.ToLower(
+		filepath.Ext(path),
+	)
+
+	if !supportedImageExtension(ext) {
+		return "", fmt.Errorf(
+			"unsupported image format %q",
+			ext,
+		)
+	}
+
+	return path, nil
 }
 
-func convertArticleImage(
-	sourcePath string,
-	outputPath string,
-	ext string,
-) error {
 
-	/*
-		Article diagrams and screenshots are
-		encoded losslessly.
-
-		This prevents UI text, diagrams,
-		lines and screenshots becoming blurry.
-	*/
-	args := []string{
-		"-y",
-		"-i",
-		sourcePath,
-		"-c:v",
-		"libwebp",
-		"-lossless",
-		"1",
-		"-compression_level",
-		"6",
-		outputPath,
-	}
-
-	return runFFmpeg(args)
-}
-
-func processCover(
-	sourcePath string,
-	imagesDir string,
-) error {
-
-	coverPath := filepath.Join(
-		imagesDir,
-		"cover.webp",
-	)
-
-	cardPath := filepath.Join(
-		imagesDir,
-		"card.webp",
-	)
-
-	/*
-		Article hero.
-
-		16:9
-		1600 × 900
-	*/
-	coverFilter := fmt.Sprintf(
-		"scale=%d:%d:force_original_aspect_ratio=increase,crop=%d:%d",
-		coverWidth,
-		coverHeight,
-		coverWidth,
-		coverHeight,
-	)
-
-	coverArgs := []string{
-		"-y",
-		"-i",
-		sourcePath,
-		"-vf",
-		coverFilter,
-		"-c:v",
-		"libwebp",
-		"-quality",
-		"92",
-		"-compression_level",
-		"6",
-		coverPath,
-	}
-
-	if err := runFFmpeg(
-		coverArgs,
-	); err != nil {
-		return err
-	}
-
-	/*
-		Blog card.
-
-		2:1
-		1000 × 500
-
-		This is also used by the blurred
-		card shadow image.
-	*/
-	cardFilter := fmt.Sprintf(
-		"scale=%d:%d:force_original_aspect_ratio=increase,crop=%d:%d",
-		cardWidth,
-		cardHeight,
-		cardWidth,
-		cardHeight,
-	)
-
-	cardArgs := []string{
-		"-y",
-		"-i",
-		sourcePath,
-		"-vf",
-		cardFilter,
-		"-c:v",
-		"libwebp",
-		"-quality",
-		"90",
-		"-compression_level",
-		"6",
-		cardPath,
-	}
-
-	return runFFmpeg(
-		cardArgs,
-	)
-}
-
-func runFFmpeg(
-	args []string,
-) error {
-	cmd := exec.Command(
-		"ffmpeg",
-		args...,
-	)
-
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	return cmd.Run()
-}
-
-func copyImages(
+func copyOriginalImages(
 	src string,
 	dst string,
 ) error {
@@ -305,7 +194,7 @@ func copyImages(
 		)
 
 		if entry.IsDir() {
-			if err := copyImages(
+			if err := copyOriginalImages(
 				sourcePath,
 				targetPath,
 			); err != nil {
@@ -315,21 +204,46 @@ func copyImages(
 			continue
 		}
 
-		data, err := os.ReadFile(
+		if err := copyFile(
 			sourcePath,
-		)
-		if err != nil {
-			return err
-		}
-
-		if err := os.WriteFile(
 			targetPath,
-			data,
-			0o644,
 		); err != nil {
 			return err
 		}
 	}
 
 	return nil
+}
+
+func copyFile(
+	src string,
+	dst string,
+) error {
+	source, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer source.Close()
+
+	if err := os.MkdirAll(
+		filepath.Dir(dst),
+		0o755,
+	); err != nil {
+		return err
+	}
+
+	target, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+
+	if _, err := io.Copy(
+		target,
+		source,
+	); err != nil {
+		target.Close()
+		return err
+	}
+
+	return target.Close()
 }

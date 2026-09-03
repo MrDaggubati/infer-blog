@@ -34,3 +34,5 @@ go.work.sum
 
 #repo content
 /public/
+
+/.cache/
