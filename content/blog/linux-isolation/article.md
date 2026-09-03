@@ -1,13 +1,20 @@
 ---
-
-title: Linux sandboxing
-slug: linux-sandboxing
+title: Linux isolation
+slug: linux-isolation
 date: 2026-07-27
 author: Sudhakar Daggubati
-tags: Security,Virtualization,Linux
+summary: >
+  How modern workloads can combine unikernels, MicroVMs, Landlock, and Bubblewrap to achieve strong isolation without the overhead of traditional virtual machines.
+tags:
+  - Security
+  - Virtualization
+  - Linux
 featured: false
----------------
 
+image: images/unikernel-illustration.png
+cover: images/unikernel-illustration.png
+
+---
 Security boundaries are no longer limited to containers and full virtual machines. Modern Linux platforms increasingly combine multiple isolation primitives to reduce attack surface while keeping startup times and resource usage low.
 
 Rather than relying on a single layer of defense, lightweight virtualization and kernel-enforced sandboxing can work together to isolate workloads according to their risk profile.
@@ -16,7 +23,11 @@ Rather than relying on a single layer of defense, lightweight virtualization and
 
 Different workloads require different guarantees.
 
+
+
 Unikernels compile an application together with only the operating system components it actually needs. The resulting image has a dramatically smaller attack surface, minimal boot time, and very little unnecessary code.
+
+![Unikernel](images/unikernel-illustration.png)
 
 MicroVMs provide hardware virtualization with startup times measured in milliseconds while consuming far fewer resources than traditional virtual machines. They combine the security benefits of virtualization with an execution model that is practical for short-lived workloads and serverless platforms.
 
@@ -45,4 +56,3 @@ Landlock limits filesystem capabilities even if the process is compromised.
 The result is a system where an attacker must bypass multiple independent protection mechanisms rather than exploiting a single isolation boundary.
 
 Instead of asking whether containers, virtual machines, or sandboxing are sufficient on their own, design systems that compose these technologies together. Small, purpose-built execution environments with least-privilege access provide a stronger foundation for secure infrastructure without sacrificing performance or developer experience.
-

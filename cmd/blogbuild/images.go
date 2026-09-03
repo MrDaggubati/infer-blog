@@ -22,6 +22,32 @@ func supportedImageExtension(
 	}
 }
 
+func copyReferencedImage(
+	postDir string,
+	postOutputDir string,
+	value string,
+) error {
+
+	source, err :=
+		resolveImageSource(
+			postDir,
+			value,
+		)
+	if err != nil {
+		return err
+	}
+
+	target := filepath.Join(
+		postOutputDir,
+		filepath.FromSlash(value),
+	)
+
+	return copyFile(
+		source,
+		target,
+	)
+}
+
 func processImages(
 	postDir string,
 	postOutputDir string,
@@ -37,24 +63,13 @@ func processImages(
 		"images",
 	)
 
-	if err := os.MkdirAll(
-		outputImagesDir,
-		0o755,
-	); err != nil {
-		return err
-	}
-
 	/*
-		Copy authored images exactly as they are.
+		Copy every authored image.
 
-		SVG remains SVG.
-		PNG remains PNG.
-		JPEG remains JPEG.
-		WebP remains WebP.
-
-		No resizing.
-		No rasterization.
-		No compression.
+		This covers:
+		- front matter image
+		- front matter cover
+		- images referenced inside article.md
 	*/
 	if err := copyOriginalImages(
 		sourceImagesDir,
@@ -64,9 +79,7 @@ func processImages(
 	}
 
 	/*
-		Validate the image and cover references from meta.json.
-
-		Do NOT rewrite them to card.webp / cover.webp.
+		Validate front matter image reference.
 	*/
 	if strings.TrimSpace(meta.Image) != "" {
 		if _, err := resolveImageSource(
@@ -80,6 +93,9 @@ func processImages(
 		}
 	}
 
+	/*
+		Validate front matter cover reference.
+	*/
 	if strings.TrimSpace(meta.Cover) != "" {
 		if _, err := resolveImageSource(
 			postDir,

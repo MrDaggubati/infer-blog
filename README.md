@@ -9,6 +9,8 @@ This repository contains the authored Markdown, metadata, source images, Go stat
 
 The main website consumes the generated blog index and article HTML from this repository.
 
+
+
 ---
 
 ## Configuration
@@ -336,7 +338,7 @@ Example:
     "image": "${BLOG_BASE_URL}/blog/platform-engineering/images/card.webp",
     "cover": "${BLOG_BASE_URL}/blog/platform-engineering/images/cover.webp",
     "article": "${BLOG_BASE_URL}/blog/platform-engineering/article.html",
-    "url": "${MAIN_SITE_URL}/blog/platform-engineering"
+    "url": "${MAIN_SITE_URL}/blog/platform-engineering/article.html"
   }
 ]
 ```

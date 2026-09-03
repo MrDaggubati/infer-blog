@@ -14,6 +14,7 @@ import (
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/parser"
+	"gopkg.in/yaml.v3"	
 )
 
 var (
@@ -44,28 +45,25 @@ var markdown = goldmark.New(
 )
 
 type BlogMeta struct {
-	Title       string   `json:"title"`
-	Slug        string   `json:"slug"`
-	Date        string   `json:"date"`
-	Author      string   `json:"author"`
-	Summary     string   `json:"summary"`
-	Description string   `json:"description"`
-	Tags        []string `json:"tags"`
-	Featured    bool     `json:"featured"`
+	Title string `json:"title" yaml:"title"`
+	Slug string `json:"slug" yaml:"slug"`
+	Date string `json:"date" yaml:"date"`
+	Author string `json:"author" yaml:"author"`
+	Summary string `json:"summary" yaml:"summary"`
+	Description string `json:"description,omitempty" yaml:"description,omitempty"`
+	Tags []string `json:"tags" yaml:"tags"`
+	Featured bool `json:"featured" yaml:"featured"`
 
-	// Source image declared in meta.json.
-	// During build this is rewritten to:
-	// images/card.webp
-	Image string `json:"image,omitempty"`
+	Image string `json:"image,omitempty" yaml:"image,omitempty"`
+	Cover string `json:"cover,omitempty" yaml:"cover,omitempty"`
 
-	// Source hero declared in meta.json.
-	// During build this is rewritten to:
-	// images/cover.webp
-	Cover string `json:"cover,omitempty"`
-
-	// Generated public URLs.
+	/*
+		Generated fields.
+		These do NOT come from article.md.
+	*/
 	Article string `json:"article"`
-	URL     string `json:"url"`
+
+	URL string `json:"url"`
 }
 
 func buildBlog() error {
@@ -97,12 +95,19 @@ func buildBlog() error {
 			entry.Name(),
 		)
 
-		meta, err := readMeta(
+		meta, body, err := readArticle(
 			filepath.Join(
 				postDir,
-				"meta.json",
+				"article.md",
 			),
 		)
+		if err != nil {
+			return fmt.Errorf(
+				"%s: %w",
+				entry.Name(),
+				err,
+			)
+		}
 		if err != nil {
 			return fmt.Errorf(
 				"%s: %w",
@@ -115,20 +120,6 @@ func buildBlog() error {
 			return fmt.Errorf(
 				"%s: %w",
 				entry.Name(),
-				err,
-			)
-		}
-
-		body, err := renderMarkdownFile(
-			filepath.Join(
-				postDir,
-				"article.md",
-			),
-		)
-		if err != nil {
-			return fmt.Errorf(
-				"%s: %w",
-				meta.Slug,
 				err,
 			)
 		}
@@ -186,8 +177,8 @@ func buildBlog() error {
 		meta.URL =
 			siteBaseURL +
 				"/blog/" +
-				meta.Slug
-
+				meta.Slug +
+				"/article.html"
 		/*
 			At this point processImages has already changed
 			Image/Cover to their generated WebP filenames.
@@ -225,24 +216,98 @@ func buildBlog() error {
 	return nil
 }
 
-func readMeta(
+func readArticle(
 	path string,
-) (BlogMeta, error) {
+) (BlogMeta, template.HTML, error) {
 	var meta BlogMeta
 
-	data, err := os.ReadFile(path)
+	source, err := os.ReadFile(path)
 	if err != nil {
-		return meta, err
+		return meta, "", err
 	}
 
-	if err := json.Unmarshal(
-		data,
+	/*
+		Normalize line endings so front matter parsing
+		works consistently across Linux/Windows.
+	*/
+	source = bytes.ReplaceAll(
+		source,
+		[]byte("\r\n"),
+		[]byte("\n"),
+	)
+
+	if !bytes.HasPrefix(
+		source,
+		[]byte("---\n"),
+	) {
+		return meta, "",
+			fmt.Errorf(
+				"article is missing YAML front matter",
+			)
+	}
+
+	/*
+		Remove opening --- and find closing ---.
+	*/
+	remaining :=
+		source[len("---\n"):]
+
+	end :=
+		bytes.Index(
+			remaining,
+			[]byte("\n---\n"),
+		)
+
+	if end == -1 {
+		return meta, "",
+			fmt.Errorf(
+				"article front matter is not closed",
+			)
+	}
+
+	frontMatter :=
+		remaining[:end]
+
+	body :=
+		remaining[
+			end+len("\n---\n"):
+		]
+
+	if err := yaml.Unmarshal(
+		frontMatter,
 		&meta,
 	); err != nil {
-		return meta, err
+		return meta, "",
+			fmt.Errorf(
+				"parse front matter: %w",
+				err,
+			)
 	}
 
-	return meta, nil
+	if err := validateMeta(
+		meta,
+	); err != nil {
+		return meta, "", err
+	}
+
+	var out bytes.Buffer
+
+	if err := markdown.Convert(
+		body,
+		&out,
+	); err != nil {
+		return meta, "",
+			fmt.Errorf(
+				"render markdown: %w",
+				err,
+			)
+	}
+
+	return meta,
+		template.HTML(
+			out.String(),
+		),
+		nil
 }
 
 func validateMeta(
@@ -280,31 +345,6 @@ func validateMeta(
 	return nil
 }
 
-func renderMarkdownFile(
-	path string,
-) (template.HTML, error) {
-	source, err := os.ReadFile(path)
-	if err != nil {
-		return "", err
-	}
-
-	var out bytes.Buffer
-
-	if err := markdown.Convert(
-		source,
-		&out,
-	); err != nil {
-		return "",
-			fmt.Errorf(
-				"render markdown: %w",
-				err,
-			)
-	}
-
-	return template.HTML(
-		out.String(),
-	), nil
-}
 
 func articleAssetURL(
 	slug string,
