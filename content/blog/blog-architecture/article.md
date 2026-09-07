@@ -81,8 +81,8 @@ There is no requirement to bootstrap a client-side application before the page b
       +--------------+                +--------------+
       | Templates    |                | Content      |
       |              |                |              |
-      | base         |                | products     |
-      | products     |                | services     |
+      | base         |                | solutions     |
+      | solutions     |                | services     |
       | case studies |                | blog         |
       | policies     |                | pages        |
       +------+-------+                +------+-------+
@@ -149,7 +149,7 @@ The same project can generate a deployable directory:
 dist/
 |
 +-- index.html
-+-- products/
++-- solutions/
 +-- services/
 +-- case-studies/
 +-- about/
