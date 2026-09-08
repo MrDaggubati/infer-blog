@@ -1,6 +1,6 @@
 ---
 title: Building a Portable Web Platform with Go, HTMX and Static Output
-slug: building-portable-web-platform-go-htmx-static
+slug: web-platform-go-htmx-static
 date: 2026-09-04
 author: Sudhakar Daggubati
 summary: >
