@@ -5,7 +5,7 @@ description: >
     Moving from a flat home network to a segmented, deny-by-default architecture
     using Proxmox VE, OPNsense, managed switching, VLANs, and isolated trust
     zones for compute, storage, IoT, media, and work infrastructure.
-date: 2026-09-08
+date: 2026-05-11
 author: Sudhakar Daggubati
 tags:
 - Zero Trust
@@ -15,7 +15,7 @@ tags:
 - Firewall
 - Cybersecurity
 summary: >
-    A practical journey from an ISP router and flat network to a segmented infrastructure built around Proxmox VE, virtualized OPNsense, managed
+    A journey from an ISP router and flat network to a segmented infrastructure built around Proxmox VE, virtualized OPNsense, managed
     switching, and 802.1Q VLANs. The setup separates compute, storage, IoT, media, and work environments into explicit trust zones with deny-by-default
     policies, reducing lateral movement while bringing enterprise networking principles into a self-hosted environment.
 featured: false
@@ -46,5 +46,10 @@ Building a network that is "VLAN-Aware" from the Proxmox bridge down to the mana
 In an era of autonomous bots and AI-driven exploits, a flat network isn't just a risk—it's a target.
 
 Thanks to the wonderful folks at Deciso (a Dutch firm) for forking it and managing a true OSS Version.
+
+```
+
+```
+
 
 #Proxmox #OPNsense #Networking #CyberSecurity #SelfHosted #DevOps

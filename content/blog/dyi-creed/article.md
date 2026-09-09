@@ -9,7 +9,7 @@ tags:
   - vLLM
   - NVIDIA
 summary: >
-featured: true
+featured: false
 ---
 
 

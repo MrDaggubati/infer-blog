@@ -33,6 +33,20 @@ var (
 	blogCNAME = envOrDefault("BLOG_CNAME", "blog.inferorigins.com")
 )
 
+var canonicalTags = map[string]string{
+    "go":       "Go",
+    "linux":    "Linux",
+    "htmx":     "HTMX",
+    "nvidia":   "NVIDIA",
+    "llmops":   "LLMOps",
+    "mlflow":   "MLflow",
+    "opnsense": "OPNsense",
+    "spiffe":   "SPIFFE",
+    "spire":    "SPIRE",
+    "vllm":     "vLLM",
+    "k8s":      "k8s",
+}
+
 var markdown = goldmark.New(
 	goldmark.WithExtensions(
 		extension.GFM,
@@ -64,6 +78,47 @@ type BlogMeta struct {
 	Article string `json:"article"`
 
 	URL string `json:"url"`
+}
+
+func normalizeTags(tags []string) []string {
+    seen := make(map[string]struct{})
+    result := make([]string, 0, len(tags))
+
+    for _, raw := range tags {
+        key := normalizeTag(raw)
+
+        if key == "" {
+            continue
+        }
+
+        if _, exists := seen[key]; exists {
+            continue
+        }
+
+        seen[key] = struct{}{}
+
+        if label, ok := canonicalTags[key]; ok {
+            result = append(
+                result,
+                label,
+            )
+        } else {
+            result = append(
+                result,
+                key,
+            )
+        }
+    }
+
+    sort.Slice(
+        result,
+        func(i, j int) bool {
+            return strings.ToLower(result[i]) <
+                strings.ToLower(result[j])
+        },
+    )
+
+    return result
 }
 
 func buildBlog() error {
@@ -108,21 +163,8 @@ func buildBlog() error {
 				err,
 			)
 		}
-		if err != nil {
-			return fmt.Errorf(
-				"%s: %w",
-				entry.Name(),
-				err,
-			)
-		}
 
-		if err := validateMeta(meta); err != nil {
-			return fmt.Errorf(
-				"%s: %w",
-				entry.Name(),
-				err,
-			)
-		}
+		meta.Tags = normalizeTags(meta.Tags)
 
 		postOutputDir := filepath.Join(
 			outputDir,
@@ -214,6 +256,16 @@ func buildBlog() error {
 	}
 
 	return nil
+}
+
+func normalizeTag(value string) string {
+    value = strings.TrimSpace(value)
+    value = strings.Join(
+        strings.Fields(value),
+        " ",
+    )
+
+    return strings.ToLower(value)
 }
 
 func readArticle(

@@ -7,14 +7,16 @@ import (
 	"path/filepath"
 	"strings"
 )
+
 func supportedImageExtension(
 	ext string,
 ) bool {
-	switch ext {
+	switch strings.ToLower(ext) {
 	case ".svg",
 		".png",
 		".jpg",
-		".jpeg":
+		".jpeg",
+		".webp":
 		return true
 
 	default:
@@ -22,64 +24,40 @@ func supportedImageExtension(
 	}
 }
 
-func copyReferencedImage(
-	postDir string,
-	postOutputDir string,
-	value string,
-) error {
+/*
+	processImages copies images that live beside article.md.
 
-	source, err :=
-		resolveImageSource(
-			postDir,
-			value,
-		)
-	if err != nil {
-		return err
-	}
+	Source:
 
-	target := filepath.Join(
-		postOutputDir,
-		filepath.FromSlash(value),
-	)
+	  content/blog/my-post/
+	    article.md
+	    card.png
+	    cover.jpg
+	    diagram.svg
 
-	return copyFile(
-		source,
-		target,
-	)
-}
+	Output:
 
+	  public/blog/my-post/
+	    article.html
+	    card.png
+	    cover.jpg
+	    diagram.svg
+*/
 func processImages(
 	postDir string,
 	postOutputDir string,
 	meta *BlogMeta,
 ) error {
-	sourceImagesDir := filepath.Join(
+
+	if err := copyPostImages(
 		postDir,
-		"images",
-	)
-
-	outputImagesDir := filepath.Join(
 		postOutputDir,
-		"images",
-	)
-
-	/*
-		Copy every authored image.
-
-		This covers:
-		- front matter image
-		- front matter cover
-		- images referenced inside article.md
-	*/
-	if err := copyOriginalImages(
-		sourceImagesDir,
-		outputImagesDir,
 	); err != nil {
 		return err
 	}
 
 	/*
-		Validate front matter image reference.
+		Validate front matter card image.
 	*/
 	if strings.TrimSpace(meta.Image) != "" {
 		if _, err := resolveImageSource(
@@ -94,7 +72,7 @@ func processImages(
 	}
 
 	/*
-		Validate front matter cover reference.
+		Validate front matter cover image.
 	*/
 	if strings.TrimSpace(meta.Cover) != "" {
 		if _, err := resolveImageSource(
@@ -111,10 +89,98 @@ func processImages(
 	return nil
 }
 
+/*
+	copyPostImages copies supported image files from
+	the same directory as article.md.
+
+	article.md itself is ignored.
+*/
+func copyPostImages(
+	srcDir string,
+	dstDir string,
+) error {
+	entries, err := os.ReadDir(srcDir)
+	if err != nil {
+		return err
+	}
+
+	for _, entry := range entries {
+		sourcePath := filepath.Join(
+			srcDir,
+			entry.Name(),
+		)
+
+		targetPath := filepath.Join(
+			dstDir,
+			entry.Name(),
+		)
+
+		/*
+			Recurse into subdirectories.
+
+			This allows either:
+
+			  article.md
+			  card.png
+
+			or:
+
+			  article.md
+			  images/card.png
+
+			or arbitrarily nested image directories.
+		*/
+		if entry.IsDir() {
+			if err := copyPostImages(
+				sourcePath,
+				targetPath,
+			); err != nil {
+				return err
+			}
+
+			continue
+		}
+
+		ext := strings.ToLower(
+			filepath.Ext(entry.Name()),
+		)
+
+		/*
+			Only publish supported image files.
+			article.md and other source files are ignored.
+		*/
+		if !supportedImageExtension(ext) {
+			continue
+		}
+
+		if err := copyFile(
+			sourcePath,
+			targetPath,
+		); err != nil {
+			return fmt.Errorf(
+				"copy image %s: %w",
+				sourcePath,
+				err,
+			)
+		}
+	}
+
+	return nil
+}
+/*
+	resolveImageSource validates an image path referenced
+	from front matter.
+
+	Examples:
+
+	  image: card.png
+	  cover: cover.jpg
+*/
 func resolveImageSource(
 	postDir string,
 	value string,
 ) (string, error) {
+
 	value = strings.TrimSpace(value)
 
 	if value == "" {
@@ -123,6 +189,9 @@ func resolveImageSource(
 		)
 	}
 
+	/*
+		Remote images can simply be left alone.
+	*/
 	if strings.HasPrefix(
 		value,
 		"http://",
@@ -131,15 +200,28 @@ func resolveImageSource(
 			value,
 			"https://",
 		) {
+		return value, nil
+	}
+
+	clean :=
+		filepath.Clean(
+			filepath.FromSlash(value),
+		)
+
+	/*
+		Do not allow article metadata to escape
+		the article directory via ../ paths.
+	*/
+	if clean == ".." ||
+		strings.HasPrefix(
+			clean,
+			".."+string(filepath.Separator),
+		) {
 		return "", fmt.Errorf(
-			"remote image sources are not supported: %s",
+			"image path escapes article directory: %s",
 			value,
 		)
 	}
-
-	clean := filepath.Clean(
-		filepath.FromSlash(value),
-	)
 
 	path := filepath.Join(
 		postDir,
@@ -177,64 +259,11 @@ func resolveImageSource(
 	return path, nil
 }
 
-
-func copyOriginalImages(
-	src string,
-	dst string,
-) error {
-	entries, err := os.ReadDir(src)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-
-		return err
-	}
-
-	if err := os.MkdirAll(
-		dst,
-		0o755,
-	); err != nil {
-		return err
-	}
-
-	for _, entry := range entries {
-		sourcePath := filepath.Join(
-			src,
-			entry.Name(),
-		)
-
-		targetPath := filepath.Join(
-			dst,
-			entry.Name(),
-		)
-
-		if entry.IsDir() {
-			if err := copyOriginalImages(
-				sourcePath,
-				targetPath,
-			); err != nil {
-				return err
-			}
-
-			continue
-		}
-
-		if err := copyFile(
-			sourcePath,
-			targetPath,
-		); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 func copyFile(
 	src string,
 	dst string,
 ) error {
+
 	source, err := os.Open(src)
 	if err != nil {
 		return err

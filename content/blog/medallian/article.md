@@ -14,7 +14,7 @@ tags:
 summary: >
     Medallion architecture remains a useful model for representing data quality and lifecycle states, but its physical implementation need not become an
     architectural ritual. With mature governance capabilities such as ABAC, fine-grained access controls, and dynamic masking, separation can increasingly be driven by domain ownership, lifecycle, compliance, blast radius, SLAs, and operational requirements rather than rigid Bronze, Silver, and Gold layers.
-featured: false
+featured: true
 ---
 
 “𝐇𝐨𝐰 𝐦𝐚𝐧𝐲 𝐥𝐚𝐲𝐞𝐫𝐬?”

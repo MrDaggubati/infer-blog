@@ -12,7 +12,7 @@ tags:
 summary: >
     MLflow's AI Gateway handles request tracing and basic budgets well, but it isn't yet built to govern coding agents at scale.Routing by capability, prompt, or intent, enforcing budgets across teams and applications, and managing cache and cost, that is a different layer of maturity, and one MLflow hasn't reached yet."
 
-featured: false
+featured: true
 
 ---
 

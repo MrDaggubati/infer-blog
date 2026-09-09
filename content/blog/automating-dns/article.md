@@ -16,12 +16,12 @@ summary: >
   The latter doesn't bind you to Kubernetes.
 
 tags: 
-    - Security
+    - Security  
     - Virtualization
     - Linux
 
-image: images/dns-flow.png
-cover: images/dns-flow.png
+image: dns-flow.png
+cover: dns-flow.png
 
 featured: false
 ---
@@ -31,7 +31,7 @@ There are multiple scenarios in which lack of this capability makes it hard to c
 
 A back and forth deployment to keep DNS records, zones in sync
 
-![DNS Flow](images/dns-flow.png)
+![DNS Flow](dns-flow.png)
 
 
 ## Temporary zone and validate before apply 
@@ -62,7 +62,7 @@ If Terraform already manages your infrastructure, **use Terraform alone by defau
   zone file import while azure does, besides integration tests are non exist and complex to craft, mostly simple nslookup validation.
 
 
-![DNSControl-Flow](images/DNSControl-flow.png)
+![DNSControl-Flow](DNSControl-flow.png)
 
 DNScontrol and Terraform are both powerful tools for managing DNS records, but they have different capabilities and use cases. Let's use them together to make a DNS management predictable and fault proof.
 

@@ -14,7 +14,7 @@ tags:
     - ubuntu
     - virtualization
     - kvm
-featured: true
+featured: false
 ---
 
 Little snippet to prepare the host for GPU passthrough

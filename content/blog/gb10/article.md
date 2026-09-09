@@ -12,7 +12,7 @@ tags:
 summary: >
  
 
-featured: false
+featured: true
 ---
 
 DGX Spark (GB10, 128 GB unified memory) is proving to be a capable platform for self-hosting LLMs.
