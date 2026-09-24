@@ -1,8 +1,8 @@
 ---
-title: Platform Bootstrapper boundaries - Orchestrate, do not manage state 
+title: IaC - Orchestrate, do not manage state 
 slug: orchestrate-do-not-manage-state
 description: >
-    A platform bootstrapper needs a dependency graph, readiness checks and change detection, but that does not make it Terraform. The line is ownership: let each engine stay the authority on its own resources.
+    A platform orchestrator needs a dependency graph, readiness checks, and change detection yet that doesn't warrant to emulate Terraform. The dividing line is ownership: let each underlying engine remain the ultimate authority on its own resources.
 date: 2026-09-23
 author: Sudhakar Daggubati
 tags:
@@ -20,96 +20,49 @@ featured: true
 
 Got a self doubt if my platform bootstrapper solution duplicating what terraform natively provides. 
 
-Kforge,a k8s orchastrator that bootstraps multi tenant production K8s cluster either on on-prem or cloud, seeds it with all tooling and capabilities to be a production cluster on it's own merit wth all bells and vistle and act as a K8S vending machine for tenants using ASO, CAPI, CAPZ, CAPMOX capabiities.
+Kforge,a k8s orchastrator that bootstraps multi tenant production K8s cluster either on on-prem or cloud, seeds it with all tooling and capabilities to be a production cluster on it's own merit wth all bells and whistle and act as a K8S vending machine for tenants using ASO, CAPI, CAPZ, CAPMOX capabiities.
 
 
- Design goal was to have least possible terraform while not trying to re-invent what terraform provides and relegate bullk of logic to orchastraor to compose K8S artifacts.
+ Design goal was to maximize k8s composability and reconiliation capabilities and minimal terraform while not re-inventing what terraform provides.
 
 
-Most bootstrap IaC infra is to run iteratively executing,spinng infra and addressing all the dependencies refining the IaC logic and tweaking dependencies.
+The traditional IaC bootstrap workflow relies on iterative provisioning to untangle resource dependencies. Unfortunately, clean-slate environment redeployments frequently trigger recursive dependency loops and cascading debugging steps.
 
-Ask to re-deploy the whole environment; the story starts from 0 and same iterative approach; unmet dependencies, dependencies that formed as recursive graphs.
-
-For example a Keycloak deployment failure may look like a Helm problem, that needs a Kubernetes manifest fix, which inturn an external resource provisioning and access requirement. 
-
+Consider a Keycloak rollout failure: a surface-level Helm issue often masks a deeper Kubernetes manifest misconfiguration, which itself is blocked by an upstream external resource or access policy gap
 
 ## The bootstrap graph nobody owns
 
-Offlate a more modern apporach followed is to use a often a bootstrap cluster is a readymade kind or k3s
+Lately, a common modern shortcut is to use a pre-packaged bootstrap cluster like Kind or K3s. However, when the goal is to spin up a full-fledged production cluster—whether on-premise or in the cloud—with strict multitenancy and state/reconciliation delegated to GitOps, you inevitably need a proper, full-scale Kubernetes cluster.
 
-But intended goal to spin a full fledged cluster either on-prem or on cloud and multitenancy where state and reconciliation is relegated to gitops necessiated a proper k8s cluster.
+![alt text](image-7.png)
 
+While this might sound trivial on paper, enterprise prerequisites amplify complexity tenfold, demanding intricate dependency management and precise ordering.
 
-This may look trivial, an enterprise solution pre-requisites are 10X more than that and needs an intricate dependency management and ordering.
-
-it raises a bigger question. If a solution has to manage **dependency graph**, **ordering**, **readiness checks** and change detection, is the solution slowly turning into Terraform?
-
-
-```mermaid
-flowchart TD
-    cluster["Create Kubernetes cluster"]
-    cilium["Install Cilium"]
-    gwapi["Install Gateway API"]
-    xp["Install Crossplane"]
-    xrd["Establish XRDs"]
-    ns["Create PlatformNamespaces"]
-    eso["Install ESO"]
-    vault["Vault"]
-    sec["keycloak-secrets<br/>(Vault-backed)"]
-    db["keycloak-database"]
-    kop["Install Keycloak Operator"]
-    cr["Keycloak CR"]
-    svc["Keycloak Service"]
-    route["HTTPRoute"]
-    cgw["Cilium Gateway + TLS"]
-    idc["Configure identity consumers"]
-
-    cluster --> cilium
-    cilium --> gwapi
-    cilium --> xp
-    xp --> xrd
-    xrd --> ns
-    ns --> eso
-    ns --> kop
-
-    vault --> sec
-    eso --> sec
-    sec --> kop
-    sec -->|"DB secret"| db
-    sec -->|"bootstrap secret"| cr
-    db --> cr
-    kop --> cr
-
-    cr --> svc
-    svc --> route
-    route --> cgw
-    gwapi --> cgw
-    cr --> idc
-
-    class cluster terraform
-    class cilium,xp,eso,kop helm
-    class gwapi,sec,db,cr,svc,route,cgw k8s
-    class xrd,ns,idc crossplane
-    class vault external
-
-    classDef terraform fill:#e9d8fd,stroke:#6b46c1,color:#1a1a1a
-    classDef helm fill:#bee3f8,stroke:#2b6cb0,color:#1a1a1a
-    classDef k8s fill:#c6f6d5,stroke:#2f855a,color:#1a1a1a
-    classDef crossplane fill:#fed7aa,stroke:#c05621,color:#1a1a1a
-    classDef external fill:#edf2f7,stroke:#718096,color:#1a1a1a
-```
+This raises a critical question: If a GitOps or bootstrapping tool has to manage **dependency graph**, **ordering**, **readiness checks** and change detection, is it slowly turning back into Terraform? 
 
 
-## No single plan across engines.
+![alt text](image.png)
+
+
+## No unified plan across engines.
+
+
+Terraform, Helm, Crossplane, and Kubernetes each know a piece of this graph. 
+None of them inherently owns the whole IaC lifecycle 🧨. 
+
+
+![alt text](image-6.png)
+
+Bridging that gap is the job of an orchestrator—one that must coordinate everything without reinventing the native capabilities of the stack it wraps. This delicate balancing act is precisely why so many organizations invest heavily in internal developer platforms (IDPs) or custom bootstrap engines.
 
 
 
-Terraform, Helm, Crossplane and Kubernetes each know a piece of this graph. None of them inherently owns the whole bootstrap lifecycle 🧨. That gap is what a bootstrapper fills, and it is a legitimate job.
+
+#### Drifting and turning into a lighter version of Terraform ??
 
 
 Notice that the Keycloak operator has two incoming edges: the namespace *and* the secrets.
 
-## Is it drifting and turning into a lighter version of Terraform ??
 
 The danger is drifting toward this list of responsibilities:
 
@@ -134,97 +87,24 @@ The boundary is clear:
 
 The alternative is for KForge to be an orchestrator of authoritative engines, not a state manager:
 
-```mermaid
-flowchart TD
-    kf["KForge<br/>orchestration DAG"]
+Engineers & architects that worked on IaC knew, its hard to avoid statefullness.
 
-    kf --> hm["Helm"]
-    kf --> kb["Kubernetes"]
-    kf --> cp["Crossplane"]
+KForge does keep a little state, and it is worth being precise about it. Today it is a local file of component hashes, used to skip charts and manifests that are already applied. 
 
-    subgraph engines["Authoritative engines"]
-        hm --> hs["release state"]
-        kb --> ks["live state"]
-        cp --> xs["XR state"]
-    end
+It holds no secrets and is not a source of truth. Once the cluster exists, that record moves into a ConfigMap in the cluster, keyed to the cluster's identity, so it lives and dies with the thing it describes. 
 
-    class kf kforge
-    class hm,hs helm
-    class kb,ks k8s
-    class cp,xs crossplane
-    style engines fill:none,stroke:#718096,stroke-dasharray:4
+A fresh session reads it, then verifies against the engines, and the engines win any disagreement. Delete it and the cost is a slower run, never a wrong one.
 
-    classDef terraform fill:#e9d8fd,stroke:#6b46c1,color:#1a1a1a
-    classDef helm fill:#bee3f8,stroke:#2b6cb0,color:#1a1a1a
-    classDef k8s fill:#c6f6d5,stroke:#2f855a,color:#1a1a1a
-    classDef crossplane fill:#fed7aa,stroke:#c05621,color:#1a1a1a
-    classDef kforge fill:#fefcbf,stroke:#b7791f,color:#1a1a1a
-    classDef argo fill:#fed7e2,stroke:#b83280,color:#1a1a1a
-```
+
+![alt text](image-1.png)
+
 
 Each engine already holds the truth about the things it manages, and KForge decides which one runs next. Later, ArgoCD can take over after bootstrap:
-
-```mermaid
-flowchart TD
-    kf["KForge<br/>bootstrap / lifecycle DAG"] -->|"hands off after bootstrap"| ar["ArgoCD"]
-    ar --> hm["Helm"]
-    ar --> kb["Kubernetes"]
-    ar --> cp["Crossplane"]
-
-    class kf kforge
-    class ar argo
-    class hm helm
-    class kb k8s
-    class cp crossplane
-
-    classDef terraform fill:#e9d8fd,stroke:#6b46c1,color:#1a1a1a
-    classDef helm fill:#bee3f8,stroke:#2b6cb0,color:#1a1a1a
-    classDef k8s fill:#c6f6d5,stroke:#2f855a,color:#1a1a1a
-    classDef crossplane fill:#fed7aa,stroke:#c05621,color:#1a1a1a
-    classDef kforge fill:#fefcbf,stroke:#b7791f,color:#1a1a1a
-    classDef argo fill:#fed7e2,stroke:#b83280,color:#1a1a1a
-```
 
 ## One philosophy, three engines
 
 The design holds up because every engine follows the same rule: **ask the engine, not your own records.**
 
-```mermaid
-flowchart LR
-    subgraph H["Helm"]
-        direction TB
-        h1["desired component hash"] --> h2["Helm release metadata"]
-        h2 --> h3["compare"]
-        h3 --> h4["helm diff / upgrade"]
-    end
-
-    subgraph K["Kubernetes"]
-        direction TB
-        k1["NO KForge hash state"] --> k2["kubectl diff"]
-        k2 --> k3["Kubernetes live state"]
-    end
-
-    subgraph C["Crossplane"]
-        direction TB
-        c1["KForge applies XR"] --> c2["Crossplane reconciles XR"]
-        c2 --> c3["KForge waits for readiness"]
-    end
-
-    class h1,h3,k1,c1,c3 kforge
-    class h2,h4 helm
-    class k2,k3 k8s
-    class c2 crossplane
-    style H fill:none,stroke:#2b6cb0,stroke-dasharray:4
-    style K fill:none,stroke:#2f855a,stroke-dasharray:4
-    style C fill:none,stroke:#c05621,stroke-dasharray:4
-
-    classDef terraform fill:#e9d8fd,stroke:#6b46c1,color:#1a1a1a
-    classDef helm fill:#bee3f8,stroke:#2b6cb0,color:#1a1a1a
-    classDef k8s fill:#c6f6d5,stroke:#2f855a,color:#1a1a1a
-    classDef crossplane fill:#fed7aa,stroke:#c05621,color:#1a1a1a
-    classDef kforge fill:#fefcbf,stroke:#b7791f,color:#1a1a1a
-    classDef argo fill:#fed7e2,stroke:#b83280,color:#1a1a1a
-```
 
 **Helm.** A desired-component hash is compared against Helm's own release metadata, then `helm diff` and upgrade run as needed. This is lightweight orchestration metadata, which is fine, but only if it lives in the release rather than in a KForge database. A useful test is whether deleting all of KForge's local data would lose any information. If not, you are orchestrating. If so, you have built a second state store, and it will eventually disagree with reality.
 
@@ -238,7 +118,7 @@ flowchart LR
 
 ## Three dimensions, kept separate
 
-The Keycloak example shows that dependency ordering and lifecycle ownership are different questions. A bootstrapper answers three of them, and they should stay separate:
+The Keycloak example shows that dependency ordering and lifecycle ownership are different questions. An orchastrator answers three of them, and they should stay separate:
 
 | Dimension | Modeled as | The question it answers |
 |---|---|---|
@@ -248,7 +128,7 @@ The Keycloak example shows that dependency ordering and lifecycle ownership are 
 
 Selection and order are easy to get right, and most tools do. **Ownership is the one to be strict about.**
 
-The test is which question the bootstrapper is answering:
+The ultimate test is which question the orchastrator is answering:
 
 > **"What is the current state of every managed resource, and how do I transform it?"** — you are rebuilding Terraform.
 >
@@ -259,38 +139,69 @@ The test is which question the bootstrapper is answering:
 The design is sound, but five places will test it.
 
 * **The readiness contract.** "KForge waits for readiness" carries most of the design. Each engine needs a uniform answer to "is this done?": a Helm release status, Crossplane `Ready` and `Synced` conditions, or a Kubernetes rollout or condition. Keep these checks narrow and per-engine. Custom health logic for individual resources is the start of drift-tracking.
-* **Teardown and partial failure.** Apply-order DAGs are easy. Reverse-order deletion, retrying a half-applied graph, and deciding whether a failed node blocks all its dependents or only its transitive ones are what push tools toward state and locking. Decide early whether the bootstrapper supports destroy at all. 
+* **Teardown and partial failure.** Apply-order DAGs are easy. Reverse-order deletion, retrying a half-applied graph, and deciding whether a failed node blocks all its dependents or only its transitive ones are what push tools toward state and locking. Decide early whether the orchastrator supports destroy at all. 
 
     Declining to own deletion is a valid way to stay on the right side of the boundary.
 
     **KForge treats the platform as disposable and data as owned elsewhere. It never deletes stateful resources. Teardown is whole-environment and explicit, and data-bearing resources are protected or orphaned by their owning engine.**
 
-
    
 
 * **Overlap with ArgoCD.** Once ArgoCD arrives, sync waves and health assessments duplicate much of `dependsOn`. The clean split is for the DAG to cover only the bootstrap phase, up to the point where ArgoCD can take over, and then step out. If it keeps ordering everything afterwards, two schedulers will fight over the same ordering.
-* **Double ownership.** The likeliest trap is two engines managing the same thing, such as Crossplane's Helm provider and the bootstrapper's own Helm step both managing one release. Each resource should have exactly one owner, and the tool should refuse to apply when that is ambiguous.
+* **Double ownership.** The likeliest trap is two engines managing the same thing, such as Crossplane's Helm provider and the orachastrator's own Helm step both managing one release. Each resource should have exactly one owner, and the tool should refuse to apply when that is ambiguous.
 * **The hash creeping.** The component hash is useful, but resist letting it grow into a second state system. Keep it as a cheap "should I bother asking the engine?" check, never as the answer.
+
+## rough edges and lessons to learn
+
+Graph from the real `component.yaml` files was more humbling than composing it. 
+
+
+**Readiness is a separate contract from dependency.** `dependsOn` says when a component *may* start, and a `wait` says when it is *done*. Our `platform-namespaces` component waited on three of its four `PlatformNamespace` resources, and Keycloak was the one left out. 
+
+Everything that depends on it could start before the Keycloak namespace was Ready. That was the incident, and it was one missing line in a hand-written list. 
+
+The fix isn't adding the fourth name. It is deriving the **wait** from what the component actually applies and kforge knows, so the list can't drift.
+
+**Dependencies hide in what a component contains.** A Helm chart shipped an `ExternalSecret`, which needs the ESO CRDs and a working store. A StatefulSet's PVC needed a StorageClass. Every `HTTPRoute` needed a Gateway. None of these were declared. Bundle order covers them  and it's manual composition
+
+**Overlapping ownership arrives by copy-paste.** The same `ExternalSecret` was owned by a Helm chart and by a manifest component. The Keycloak CR is a candidate for the same problem once `PlatformIdentity` takes over. The rule "one owner per resource" needs enforcing, not just stating.
+
+**The hardest node isn't in the cluster.** After every rebuild, Vault has to learn the new cluster's identity (its CA and a reviewer token) before External Secrets can authenticate. ESO can't bootstrap its own authentication. That step belongs to KForge, and like cluster creation it is somewhere KForge is the engine: idempotent, rerunnable, and asking Vault what it already knows.
+
+
+>>>
+
+
+**Selection fails silently.** Two components were in no bundle, so nothing errored. They just never ran.
+
+None of these needed a *state database*. Each is caught by a check against the graph at plan time:
+
+* readiness derived from what a component applies, not hand-listed
+* every kind a component applies has its CRD provided by one of its ancestors
+* no two components own the same kind, namespace and name
+* a warning for components that no composition selects
+
+
+These are checks, not inference. They verify the declared graph and never build it, which is exactly the line between orchestrating and rebuilding Terraform.
+
 
 ## Conclusion
 
-The more you argue with IaC architectural choices, the more it points towards a graph, and to be clear about what the graph is for. 
+The Keycloak failure wasn't really a tooling problem; it was a graph problem. Any platform orchastrator ends up owning a graph, havin to manage a stae, and the risk is in what extent and what it does with it. Order and ownership have to stay separate, and a third concern, visibility, must not be confused with either:
 
-Ordering answers when something can run, and ownership answers who is responsible for it once it does.
+* **Order** decides when something can run. That is the orchestrator's job.
+* **Ownership** decides who is responsible for a resource once it runs. That belongs to the authoritative engine: Helm, Kubernetes, Crossplane, and Terraform for network and landing zone.
+* **Visibility** decides who can see the whole picture. That is a projection, a read-only graph or GraphQL API built from what the engines report, so multiple teams can reason about the platform without stepping on each other's shoes.
 
-- Authoritative state: 
+**On state:** the authoritative state stays with the engines, and KForge keeps only a rebuildable hash cache and a lock, first as a local file and later as a ConfigMap in the cluster. It holds no secrets and is never the source of truth, so deleting it costs a slower run, not a wrong one.
 
-      The source of truth, which stays with Helm, Kubernetes, Crossplane and the rest. 
-
-- A projection of that state: 
-
-      A read-only view for humans, such as a graph or GraphQL API, built from what the engines report.
+The design has a price, but it isn't the plan. `kforge platform apply --plan` resolves the graph and shows each engine's own diff, so the plan is assembled from the engines, not stored. What you give up is a shared, persistent view across teams, and that is the projection's job. It must stay rebuildable from the engines at any time. If deleting it loses information, it has become a state store, and you are rebuilding Terraform.
 
 
+Bootstrap is the part of the lifecycle that can get by with almost no state: a hash cache, a lock, and the engines' own records. Larger estates, where many teams change the platform at once, may well want a state graph (a database with a GraphQL API) to reason about it together. That is a separate layer, built as a projection of what the engines report, and it doesn't belong inside the bootstrapper.
 
-Keeping those apart possibly a good trade off, let each engine remain the authority on its own resources, and a bootstrapper can stay small, honest and useful.
+## Orchestrate, do not manage state. 
 
 
-more complex infra automation need a mature stategraph. perhaps ; state needs DB, stategraph and GraphQL so multiple teams/devs can eason with it without stepping on each others shoes.
-
+Let each engine remain the authority on its own resources, and the orchestrator can stay small, honest and useful.
 
