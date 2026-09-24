@@ -1,0 +1,23 @@
+name: KForge Platform Runner Validation - ${{ gitea.repository }} - ${{ gitea.ref_name }}
+
+on:
+  push:
+    branches:
+      - main
+
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: kforge-platform
+
+    steps:
+      - name: Verify runner
+        run: |
+          echo "Repository: ${{ gitea.repository }}"
+          echo "Ref:        ${{ gitea.ref_name }}"
+          echo "Actor:      ${{ gitea.actor }}"
+          hostname
+          uname -a
+          whoami
+          echo "Gitea platform runner works"
