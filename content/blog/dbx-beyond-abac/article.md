@@ -19,7 +19,7 @@ summary: >
     with the evolution of firewall security from individual rules to zones and identity-aware zero trust, this article explores a possible next step: topology-aware data governance. Business domains, trust boundaries,
     zone mappings, domain templates, and composable policies could provide an intent-driven governance layer capable of scaling across complex
     enterprises and the emerging agentic ecosystem.
-featured: true
+featured: false
 ---
 
 Databricks has reached an important milestone with ABAC governance. It provides a way to govern data assets bound to Databricks by combining long-established data domains, flexible tags, and ML-based classification into a practical ABAC capability.

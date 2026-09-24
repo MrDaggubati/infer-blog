@@ -13,7 +13,7 @@ tags:
   - Cloudflare
   - Static Sites
   - Platform Engineering
-featured: true
+featured: false
 ---
 
 

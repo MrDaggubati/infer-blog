@@ -13,7 +13,7 @@ tags:
 summary: >
   A static-first web portal built with Go and HTMX, where content, templates, and Markdown are compiled into plain HTML, CSS, JavaScript, and assets eliminating the need for a continuously running application server. The same codebase can later support dynamic, server-side features when needed, without abandoning the static deployment model. The result is a portal that remains simple by default while allowing capabilities like WebRTC, chatbots, or other services to evolve independently with their own runtimes.
 
-featured: true
+featured: false
 ---
 
 Websites often become application platforms too early. Others stay static for too long.
