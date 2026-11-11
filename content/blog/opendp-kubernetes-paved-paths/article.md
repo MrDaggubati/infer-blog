@@ -5,16 +5,12 @@ description: "Building self-hosted CI, application services and open data proces
 date: 2026-11-11
 author: Sudhakar Daggubati
 tags: [OpenDP, KForge, Kubernetes, Platform Engineering, GitOps, Apache Spark, Apache Iceberg]
-featured: true
-image: image-7.png
-cover: image-7.png
+featured: false
 ---
-
-# OpenDP: One Kubernetes Foundation, Several Paved Paths
 
 Kubernetes can run almost anything. That does not mean every team should have to assemble its own deployment, access controls, secrets and storage connections.
 
-I have been building **OpenDP (Open Data Platform)** around a simpler idea: operate one Kubernetes foundation, then add capabilities to it. Today those include self-hosted Git runners, web services, finite jobs and an open data stack. **KForge** provides the infrastructure automation and declarative workload profiles that connect application teams to those capabilities.
+ **OpenDP (Open Data Platform)** built around a simpler idea: operate one Kubernetes foundation, then add capabilities to it. Today those include self-hosted Git runners, web services, finite jobs and an open data stack. **KForge** provides the infrastructure automation and declarative workload profiles that connect application teams to those capabilities.
 
 I favour open-source infrastructure where the workload and operating costs justify it. Snowflake and Databricks have raised the bar for developer experience, but not every web service, batch process or analytical transformation needs a managed data platform. OpenDP is not intended to recreate Databricks. It is a practical way to run suitable workloads on a provider-neutral stack that the platform team operates.
 
@@ -102,7 +98,7 @@ flowchart LR
 
 The tenant keeps the declaration in its application repository. KForge renders Kubernetes resources into the configuration repository; Argo CD reconciles them. **Bootstrap** owns platform operators and admission controls. **Crossplane** owns tenant namespaces, ServiceAccounts, policies and quotas. **GitOps** owns the application manifests. Runtime controllers handle execution. The same resource must not have competing lifecycle owners.
 
-## Spark on the data platform already in place
+## Apache Spark workloads on the data platform 
 
 Spark did not require a new catalog or storage service. OpenDP already had Go-based ingestion into **Apache Iceberg**, **Apache Polaris** as the REST catalog and **SeaweedFS** for S3-compatible object storage.
 
@@ -111,7 +107,7 @@ flowchart LR
     CBS["CBS data"] --> GO["Go ingestion"]
     GO --> SRC["Iceberg source"]
     SRC --> SP["Spark transform"]
-    SP -.-> OUT["Iceberg output (pending)"]
+    SP -.-> OUT["Iceberg output"]
     POL["Polaris catalog + grants"] -.-> SRC
     POL -.-> OUT
     S3["SeaweedFS S3"] -.-> SRC
